@@ -33,3 +33,15 @@ jobs:
 
       - name: Run tests
         run: uv run pytest
+
+  all-checks:
+    if: always()
+    needs: [lint-and-test]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify all checks passed
+        run: |
+          if [[ "${{ needs.lint-and-test.result }}" != "success" ]]; then
+            echo "lint-and-test: ${{ needs.lint-and-test.result }}"
+            exit 1
+          fi
