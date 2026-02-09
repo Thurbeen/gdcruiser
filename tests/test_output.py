@@ -5,6 +5,7 @@ from gdcruiser.analyzer import Analyzer
 from gdcruiser.output.text import TextFormatter
 from gdcruiser.output.json import JsonFormatter
 from gdcruiser.output.dot import DotFormatter
+from gdcruiser.output.mermaid import MermaidFormatter
 
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -80,3 +81,29 @@ class TestDotFormatter:
         assert "[label=" in output
         # Should have edge declarations
         assert "->" in output
+
+
+class TestMermaidFormatter:
+    def test_format_valid_mermaid(self):
+        analyzer = Analyzer(FIXTURES)
+        result = analyzer.analyze()
+
+        formatter = MermaidFormatter()
+        output = formatter.format(result)
+
+        assert output.startswith("graph LR")
+        # Should have node definitions and edges
+        assert '["' in output
+        assert "-->" in output
+
+    def test_format_contains_nodes_and_edges(self):
+        analyzer = Analyzer(FIXTURES)
+        result = analyzer.analyze()
+
+        formatter = MermaidFormatter()
+        output = formatter.format(result)
+
+        # Should have edge declarations
+        assert "-->" in output
+        # Should have node labels
+        assert '["' in output

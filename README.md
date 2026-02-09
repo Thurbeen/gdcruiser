@@ -1,14 +1,16 @@
 # gdcruiser
 
-A dependency analyzer for Godot/GDScript projects. Scans your project to build a dependency graph, detect circular dependencies, and export visualizations.
+Static dependency analyzer for [Godot](https://godotengine.org/) projects, inspired by [dependency-cruiser](https://github.com/sverweij/dependency-cruiser). Parses GDScript (`.gd`) and scene (`.tscn`) files to build a full dependency graph, detect circular dependencies, enforce architectural rules, and export the results as text, JSON, GraphViz DOT, or Mermaid diagrams. Designed to run locally or in CI pipelines.
 
 ## Features
 
-- Analyzes `.gd` (GDScript) and `.tscn` (scene) files
+- Parses `.gd` and `.tscn` files — `extends`, `preload()`, `load()`, `class_name`, and scene script references
 - Detects circular dependencies
 - Resolves `class_name` declarations to map symbolic inheritance
-- Multiple output formats: human-readable text, JSON, and GraphViz DOT
-- Returns non-zero exit code when cycles are detected (CI-friendly)
+- Configurable architectural rules (`forbidden`, `allowed`, `required`, `circular`, `orphan`) via `.gdcruiser.json` or `pyproject.toml`
+- Multiple output formats: human-readable text, JSON, GraphViz DOT, and Mermaid
+- `--exclude` flag to filter paths from analysis
+- Non-zero exit code on cycles or rule violations (CI-friendly)
 
 ## Installation
 
@@ -27,13 +29,13 @@ uv tool install gdcruiser
 ## Usage
 
 ```
-gdcruiser [-h] [-f {text,json,dot}] [-o FILE] [--no-cycles] [-v] [path]
+gdcruiser [-h] [-f {text,json,dot,mermaid}] [-o FILE] [--no-cycles] [-v] [path]
 ```
 
 | Option | Description |
 |--------|-------------|
 | `path` | Godot project path (default: current directory) |
-| `-f, --format` | Output format: `text` (default), `json`, or `dot` |
+| `-f, --format` | Output format: `text` (default), `json`, `dot`, or `mermaid` |
 | `-o, --output` | Write output to file instead of stdout |
 | `--no-cycles` | Skip cycle detection |
 | `-v, --verbose` | Verbose output |
@@ -57,6 +59,12 @@ Generate a GraphViz DOT file:
 ```bash
 gdcruiser . -f dot -o deps.dot
 dot -Tpng deps.dot -o deps.png
+```
+
+Generate a Mermaid diagram:
+
+```bash
+gdcruiser . -f mermaid
 ```
 
 ## Output Formats
@@ -137,6 +145,41 @@ digraph dependencies {
 ```
 
 Nodes involved in cycles are highlighted in red.
+
+### Mermaid
+
+Produces a [Mermaid](https://mermaid.js.org/) flowchart that renders natively on GitHub, GitLab, Notion, and other Markdown tools — no external tooling required.
+
+```bash
+gdcruiser tests/fixtures -f mermaid
+```
+
+```mermaid
+graph LR
+    res_base_entity_gd["BaseEntity<br/>base_entity.gd"]
+    res_config_gd["config.gd"]
+    res_cycle_a_gd["CycleA<br/>cycle_a.gd"]
+    res_cycle_b_gd["CycleB<br/>cycle_b.gd"]
+    res_enemy_gd["Enemy<br/>enemy.gd"]
+    res_game_manager_gd["game_manager.gd"]
+    res_inventory_gd["Inventory<br/>inventory.gd"]
+    res_player_gd["Player<br/>player.gd"]
+    res_player_tscn["player.tscn"]
+
+    res_cycle_a_gd == preload ==> res_cycle_b_gd
+    res_cycle_b_gd == preload ==> res_cycle_a_gd
+    res_enemy_gd -- extends --> res_base_entity_gd
+    res_game_manager_gd -- preload --> res_player_tscn
+    res_game_manager_gd -- load --> res_config_gd
+    res_player_gd -- extends --> res_base_entity_gd
+    res_player_gd -- preload --> res_inventory_gd
+    res_player_tscn -- script --> res_player_gd
+
+    classDef cycle fill:#ffcccc,stroke:#cc0000
+    class res_cycle_a_gd,res_cycle_b_gd cycle
+```
+
+Cycle nodes are highlighted with a red fill, and cycle edges use thick arrows.
 
 ## Supported Dependency Patterns
 

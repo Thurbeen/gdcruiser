@@ -6,6 +6,7 @@ from .analyzer import Analyzer
 from .config import ConfigError, ConfigLoader, ConfigValidator
 from .output.dot import DotFormatter
 from .output.json import JsonFormatter
+from .output.mermaid import MermaidFormatter
 from .output.text import TextFormatter
 from .rules import RuleEngine
 
@@ -24,6 +25,7 @@ Examples:
   gdcruiser . --no-cycles        Skip cycle detection
   gdcruiser . --config rules.json Use custom config file
   gdcruiser . --validate-config  Validate config without analyzing
+  gdcruiser . -f mermaid         Output Mermaid diagram
   gdcruiser . --exclude addons   Exclude paths matching "addons"
 """,
     )
@@ -38,7 +40,7 @@ Examples:
     parser.add_argument(
         "-f",
         "--format",
-        choices=["text", "json", "dot"],
+        choices=["text", "json", "dot", "mermaid"],
         default="text",
         help="Output format (default: text)",
     )
@@ -169,6 +171,9 @@ def run(args: argparse.Namespace) -> int:
         output = formatter.format(result, rule_result)
     elif args.format == "dot":
         formatter = DotFormatter()
+        output = formatter.format(result)
+    elif args.format == "mermaid":
+        formatter = MermaidFormatter()
         output = formatter.format(result)
     else:
         formatter = TextFormatter()
