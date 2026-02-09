@@ -1,10 +1,17 @@
 from ..analyzer import AnalysisResult
+from ..rules.models import RuleCheckResult
+from .violations import ViolationTextFormatter
 
 
 class TextFormatter:
     """Formats analysis results as human-readable text."""
 
-    def format(self, result: AnalysisResult) -> str:
+    def __init__(self) -> None:
+        self._violation_formatter = ViolationTextFormatter()
+
+    def format(
+        self, result: AnalysisResult, rule_result: RuleCheckResult | None = None
+    ) -> str:
         lines: list[str] = []
 
         # Header
@@ -50,6 +57,11 @@ class TextFormatter:
                     )
             else:
                 lines.append("  (no dependencies)")
+
+        # Rule violations
+        if rule_result and rule_result.violations:
+            lines.append("")
+            lines.append(self._violation_formatter.format(rule_result))
 
         # Errors
         if result.errors:
