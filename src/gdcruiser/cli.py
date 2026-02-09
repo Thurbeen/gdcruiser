@@ -24,6 +24,7 @@ Examples:
   gdcruiser . --no-cycles        Skip cycle detection
   gdcruiser . --config rules.json Use custom config file
   gdcruiser . --validate-config  Validate config without analyzing
+  gdcruiser . --exclude addons   Exclude paths matching "addons"
 """,
     )
 
@@ -78,6 +79,14 @@ Examples:
         "--ignore-rules",
         action="store_true",
         help="Skip rule evaluation",
+    )
+
+    parser.add_argument(
+        "--exclude",
+        action="append",
+        default=None,
+        metavar="PATTERN",
+        help="Regex pattern to exclude paths from analysis (can be repeated)",
     )
 
     return parser
@@ -135,7 +144,11 @@ def run(args: argparse.Namespace) -> int:
         if config.has_rules():
             print(f"Rules loaded: {len(config.all_rules())}")
 
-    analyzer = Analyzer(project_path, verbose=args.verbose)
+    exclude = list(config.options.exclude)
+    if args.exclude:
+        exclude.extend(args.exclude)
+
+    analyzer = Analyzer(project_path, verbose=args.verbose, exclude=exclude or None)
     result = analyzer.analyze(detect_cycles=not args.no_cycles)
 
     # Evaluate rules

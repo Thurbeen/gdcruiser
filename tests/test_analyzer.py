@@ -58,3 +58,22 @@ class TestAnalyzer:
         ]
         resolved_count = sum(1 for d in extends_deps if d.resolved)
         assert resolved_count > 0
+
+    def test_exclude_removes_matching_files(self):
+        analyzer = Analyzer(FIXTURES, exclude=["cycle_"])
+        result = analyzer.analyze()
+
+        module_paths = [m.path for m in result.graph.all_modules()]
+        assert "res://cycle_a.gd" not in module_paths
+        assert "res://cycle_b.gd" not in module_paths
+        # Other modules should still be present
+        assert "res://player.gd" in module_paths
+
+    def test_exclude_nonmatching_pattern_keeps_all(self):
+        baseline = Analyzer(FIXTURES)
+        baseline_result = baseline.analyze()
+
+        analyzer = Analyzer(FIXTURES, exclude=["zzz_no_match"])
+        result = analyzer.analyze()
+
+        assert result.graph.module_count() == baseline_result.graph.module_count()
