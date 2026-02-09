@@ -371,7 +371,7 @@ gdcruiser can run as a [pre-commit](https://pre-commit.com/) hook to catch depen
 
 ```yaml
 repos:
-  - repo: https://github.com/magicletur/gdcruiser
+  - repo: https://github.com/Thurbeen/gdcruiser
     rev: v1.0.0  # use the latest release tag
     hooks:
       - id: gdcruiser
