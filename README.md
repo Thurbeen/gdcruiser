@@ -38,6 +38,10 @@ gdcruiser [-h] [-f {text,json,dot,mermaid}] [-o FILE] [--no-cycles] [-v] [path]
 | `-f, --format` | Output format: `text` (default), `json`, `dot`, or `mermaid` |
 | `-o, --output` | Write output to file instead of stdout |
 | `--no-cycles` | Skip cycle detection |
+| `--config FILE` | Path to config file (`.gdcruiser.json` or `pyproject.toml`) |
+| `--validate-config` | Validate config file and exit |
+| `--ignore-rules` | Skip rule evaluation |
+| `--exclude PATTERN` | Regex pattern to exclude paths (can be repeated) |
 | `-v, --verbose` | Verbose output |
 
 ### Examples
@@ -194,6 +198,172 @@ gdcruiser detects the following GDScript patterns:
 | `load()` | `load("res://path/to/file.gd")` |
 
 For `.tscn` files, it detects scripts attached to nodes via `[ext_resource]`.
+
+## Custom Rules
+
+gdcruiser can enforce architectural rules on your dependency graph. Rules are defined in `.gdcruiser.json` (or `pyproject.toml` under `[tool.gdcruiser]`) and evaluated with every run unless `--ignore-rules` is passed.
+
+### Configuration file
+
+gdcruiser looks for config files in this order:
+
+1. `--config <path>` (explicit)
+2. `.gdcruiser.json` in the project root
+3. `gdcruiser.json` in the project root
+4. `[tool.gdcruiser]` section in `pyproject.toml`
+
+### Rule types
+
+| Type | Meaning |
+|------|---------|
+| `forbidden` | Dependency **must not** exist — a violation is raised when a matching edge is found |
+| `allowed` | Only listed dependencies are permitted — anything else from a matching source is a violation |
+| `required` | Dependency **must** exist — a violation is raised when a matching source has no edge to the target |
+
+### Rule fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Rule identifier shown in violation messages |
+| `severity` | `"error"` \| `"warn"` \| `"info"` \| `"ignore"` | Severity level (default: `"error"`) |
+| `comment` | string | Human-readable explanation |
+| `from.path` | regex | Match source modules whose path matches |
+| `from.pathNot` | regex | Exclude source modules whose path matches |
+| `to.path` | regex | Match target modules whose path matches |
+| `to.pathNot` | regex | Exclude target modules whose path matches |
+| `circular` | bool | Flag the rule as a circular-dependency check (forbidden only) |
+| `orphan` | bool | Flag the rule as an orphan-module check (forbidden only) |
+
+Path patterns are regular expressions matched with `re.search`, so they can match any substring of the `res://` path.
+
+### Examples
+
+#### Forbid a dependency between two layers
+
+Prevent UI scripts from importing game logic directly:
+
+```json
+{
+  "forbidden": [
+    {
+      "name": "no-ui-to-core",
+      "comment": "UI must not depend on core game logic",
+      "from": { "path": "ui/" },
+      "to": { "path": "core/" }
+    }
+  ]
+}
+```
+
+#### Restrict allowed dependencies
+
+Only allow player scripts to depend on modules under `shared/` or `components/`:
+
+```json
+{
+  "allowed": [
+    {
+      "name": "player-deps",
+      "from": { "path": "player/" },
+      "to": { "path": "(shared|components)/" }
+    }
+  ]
+}
+```
+
+#### Require a dependency
+
+Ensure every autoload script preloads `config.gd`:
+
+```json
+{
+  "required": [
+    {
+      "name": "autoloads-need-config",
+      "from": { "path": "autoloads/" },
+      "to": { "path": "config\\.gd$" }
+    }
+  ]
+}
+```
+
+#### Forbid circular dependencies in specific modules
+
+```json
+{
+  "forbidden": [
+    {
+      "name": "no-cycles-in-core",
+      "circular": true,
+      "from": { "path": "core/" }
+    }
+  ]
+}
+```
+
+#### Detect orphan modules
+
+Flag modules that have no dependencies and no dependents:
+
+```json
+{
+  "forbidden": [
+    {
+      "name": "no-orphans",
+      "severity": "warn",
+      "orphan": true,
+      "from": { "pathNot": "autoloads/" }
+    }
+  ]
+}
+```
+
+#### Exclude paths from rule evaluation
+
+```json
+{
+  "options": {
+    "exclude": ["addons/", "test/"]
+  },
+  "forbidden": [
+    {
+      "name": "no-core-to-ui",
+      "from": { "path": "core/" },
+      "to": { "path": "ui/" }
+    }
+  ]
+}
+```
+
+#### pyproject.toml equivalent
+
+```toml
+[tool.gdcruiser.options]
+exclude = ["addons/"]
+
+[[tool.gdcruiser.forbidden]]
+name = "no-ui-to-core"
+severity = "error"
+comment = "UI must not depend on core game logic"
+
+[tool.gdcruiser.forbidden.from]
+path = "ui/"
+
+[tool.gdcruiser.forbidden.to]
+path = "core/"
+```
+
+### Running with rules
+
+```bash
+gdcruiser . --config .gdcruiser.json        # explicit config
+gdcruiser .                                  # auto-discovers config
+gdcruiser . --ignore-rules                   # skip rule evaluation
+gdcruiser . --config rules.json -f json      # violations in JSON output
+gdcruiser . --validate-config                # validate config and exit
+```
+
+The exit code is non-zero when any `error`-severity violation is found.
 
 ## Pre-commit Hook
 
