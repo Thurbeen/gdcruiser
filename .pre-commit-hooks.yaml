@@ -1,0 +1,8 @@
+- id: gdcruiser
+  name: gdcruiser
+  description: Validate GDScript dependencies and architecture rules
+  entry: gdcruiser . --no-cycles
+  language: python
+  pass_filenames: false
+  types: [file]
+  files: '\.(gd|tscn)$'
