@@ -1,6 +1,6 @@
 [project]
 name = "gdcruiser"
-version = "0.1.0"
+version = "1.0.0"
 description = "Dependency analyzer for Godot/GDScript projects"
 readme = "README.md"
 authors = [
