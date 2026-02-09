@@ -160,6 +160,19 @@ Install dependencies:
 uv sync
 ```
 
+Set up pre-commit hooks:
+
+```bash
+uv run pre-commit install
+```
+
+This installs hooks for `pre-commit`, `commit-msg`, and `post-checkout` stages. On every commit the hooks will:
+
+- Fix trailing whitespace and line endings
+- Lint and format with [Ruff](https://docs.astral.sh/ruff/)
+- Run the test suite with pytest
+- Enforce [Conventional Commits](https://www.conventionalcommits.org/) for commit messages
+
 Run the CLI:
 
 ```bash
