@@ -195,6 +195,36 @@ gdcruiser detects the following GDScript patterns:
 
 For `.tscn` files, it detects scripts attached to nodes via `[ext_resource]`.
 
+## Pre-commit Hook
+
+gdcruiser can run as a [pre-commit](https://pre-commit.com/) hook to catch dependency violations on every commit. Add the following to your Godot project's `.pre-commit-config.yaml`:
+
+```yaml
+repos:
+  - repo: https://github.com/magicletur/gdcruiser
+    rev: v1.0.0  # use the latest release tag
+    hooks:
+      - id: gdcruiser
+```
+
+By default the hook runs `gdcruiser . --no-cycles` and only triggers when `.gd` or `.tscn` files are changed.
+
+To customize the behavior, pass additional arguments via `args`:
+
+```yaml
+hooks:
+  - id: gdcruiser
+    args: ["--config", "rules.json"]
+```
+
+```yaml
+hooks:
+  - id: gdcruiser
+    args: ["--exclude", "addons"]
+```
+
+If any rule violation is found the hook exits with a non-zero code and blocks the commit.
+
 ## Development
 
 Install dependencies:
