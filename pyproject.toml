@@ -23,15 +23,10 @@ dev = [
 ]
 
 [tool.semantic_release]
-version_variables = []
 version_toml = []
 branch = "main"
 tag_format = "v{version}"
 commit_message = ""
-
-[tool.semantic_release.changelog]
-mode = "init"
-default_templates = { changelog_file = "" }
 
 [tool.semantic_release.commit_parser_options]
 allowed_tags = ["build", "chore", "ci", "docs", "feat", "fix", "perf", "refactor", "style", "test"]
@@ -40,8 +35,3 @@ patch_tags = ["fix", "perf"]
 
 [tool.semantic_release.remote]
 type = "github"
-token = { env = "GH_TOKEN" }
-
-[tool.semantic_release.publish]
-upload_to_vcs_release = true
-dist_glob_patterns = []
