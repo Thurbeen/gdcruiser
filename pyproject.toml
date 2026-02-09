@@ -1,7 +1,7 @@
 [project]
 name = "gdcruiser"
 version = "0.1.0"
-description = "Add your description here"
+description = "Dependency analyzer for Godot/GDScript projects"
 readme = "README.md"
 authors = [
     { name = "LeTuR", email = "magicletur@protonmail.com" }
