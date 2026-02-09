@@ -50,6 +50,24 @@ class TestCLIParser:
 
         assert args.verbose is True
 
+    def test_exclude_default_is_none(self):
+        parser = create_parser()
+        args = parser.parse_args([])
+
+        assert args.exclude is None
+
+    def test_exclude_single_pattern(self):
+        parser = create_parser()
+        args = parser.parse_args(["--exclude", "addons"])
+
+        assert args.exclude == ["addons"]
+
+    def test_exclude_multiple_patterns(self):
+        parser = create_parser()
+        args = parser.parse_args(["--exclude", "addons", "--exclude", "tests"])
+
+        assert args.exclude == ["addons", "tests"]
+
 
 class TestCLIRun:
     def test_run_text_output(self, capsys):

@@ -30,8 +30,13 @@ class AnalysisResult:
 class Analyzer:
     """Orchestrates parsing and graph building for a Godot project."""
 
-    def __init__(self, project_path: Path, verbose: bool = False) -> None:
-        self._scanner = Scanner(project_path)
+    def __init__(
+        self,
+        project_path: Path,
+        verbose: bool = False,
+        exclude: list[str] | None = None,
+    ) -> None:
+        self._scanner = Scanner(project_path, exclude=exclude)
         self._symbol_table = SymbolTable()
         self._gd_parser = GDScriptParser(self._symbol_table)
         self._tscn_parser = TscnParser()
