@@ -1,0 +1,23 @@
+[project]
+name = "gdcruiser"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "LeTuR", email = "magicletur@protonmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = []
+
+[project.scripts]
+gdcruiser = "gdcruiser:main"
+
+[build-system]
+requires = ["uv_build>=0.9.13,<0.10.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "ruff>=0.15.0",
+]
