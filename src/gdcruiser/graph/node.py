@@ -10,6 +10,8 @@ class DependencyType(Enum):
     PRELOAD = "preload"
     LOAD = "load"
     SCENE_SCRIPT = "scene_script"
+    CLASS_REF = "class_ref"
+    RESOURCE_REF = "resource_ref"
 
 
 @dataclass

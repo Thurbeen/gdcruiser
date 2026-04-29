@@ -4,6 +4,7 @@ from pathlib import Path
 from .scanner import Scanner
 from .parser.gdscript import GDScriptParser
 from .parser.tscn import TscnParser
+from .parser.tres import TresParser
 from .graph.dependency import DependencyGraph
 from .graph.cycles import CycleDetector
 from .symbols.table import SymbolTable
@@ -40,18 +41,20 @@ class Analyzer:
         self._symbol_table = SymbolTable()
         self._gd_parser = GDScriptParser(self._symbol_table)
         self._tscn_parser = TscnParser()
+        self._tres_parser = TresParser(self._symbol_table)
         self._graph = DependencyGraph()
         self._verbose = verbose
         self._errors: list[str] = []
 
     def analyze(self, detect_cycles: bool = True) -> AnalysisResult:
         """Analyze the project and return results."""
-        gd_files, tscn_files = self._scanner.find_all_files()
+        gd_files, tscn_files, tres_files = self._scanner.find_all_files()
         root = self._scanner.root
 
         if self._verbose:
             print(f"Found {len(gd_files)} GDScript files")
             print(f"Found {len(tscn_files)} scene files")
+            print(f"Found {len(tres_files)} resource files")
 
         # First pass: parse all GDScript files to build symbol table
         modules = []
@@ -74,6 +77,14 @@ class Analyzer:
                 self._graph.add_module(module)
             except Exception as e:
                 self._errors.append(f"Error parsing {tscn_file}: {e}")
+
+        # Parse resource (.tres) files
+        for tres_file in tres_files:
+            try:
+                module = self._tres_parser.parse(tres_file, root)
+                self._graph.add_module(module)
+            except Exception as e:
+                self._errors.append(f"Error parsing {tres_file}: {e}")
 
         # Detect cycles
         cycles: list[list[str]] = []

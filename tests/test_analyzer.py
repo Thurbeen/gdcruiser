@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from gdcruiser.analyzer import Analyzer
+from gdcruiser.graph.node import DependencyType
 
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -77,3 +78,44 @@ class TestAnalyzer:
         result = analyzer.analyze()
 
         assert result.graph.module_count() == baseline_result.graph.module_count()
+
+    def test_analyze_resolves_class_refs_to_paths(self):
+        analyzer = Analyzer(FIXTURES)
+        result = analyzer.analyze()
+
+        skill = result.graph.get_module("res://skill_system.gd")
+        assert skill is not None
+
+        class_refs = [
+            d for d in skill.dependencies if d.dep_type == DependencyType.CLASS_REF
+        ]
+        # Every CLASS_REF that survives resolution points at a real path.
+        assert len(class_refs) > 0
+        for dep in class_refs:
+            assert dep.resolved is True
+            assert result.graph.has_module(dep.target)
+
+    def test_analyze_includes_tres_files(self):
+        analyzer = Analyzer(FIXTURES)
+        result = analyzer.analyze()
+
+        tres = result.graph.get_module("res://heal_skill.tres")
+        assert tres is not None
+        assert tres.class_name == "HealSkill"
+        # script_class registers in the symbol table for cross-module resolution.
+        assert result.symbol_table.has_class("HealSkill")
+
+        targets = {d.target for d in tres.dependencies}
+        assert "res://skill_system.gd" in targets
+        assert "res://config.gd" in targets
+
+    def test_typed_var_in_existing_fixture_resolves(self):
+        # `enemy.gd` has `var target: Player` — this is the canonical class-ref
+        # case the new parser must catch. Ensure it now resolves to player.gd.
+        analyzer = Analyzer(FIXTURES)
+        result = analyzer.analyze()
+
+        enemy = result.graph.get_module("res://enemy.gd")
+        assert enemy is not None
+        targets = {d.target for d in enemy.dependencies}
+        assert "res://player.gd" in targets
