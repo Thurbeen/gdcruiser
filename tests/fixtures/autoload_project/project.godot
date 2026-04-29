@@ -1,0 +1,8 @@
+; Godot project file with autoload singletons
+[application]
+config/name="Autoload Test Project"
+
+[autoload]
+TurnManager="*res://scripts/autoload/turn_manager.gd"
+EventBus="*res://scripts/autoload/event_bus.gd"
+DisabledSingleton="res://scripts/autoload/disabled.gd"

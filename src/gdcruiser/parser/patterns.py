@@ -43,6 +43,10 @@ RESOURCE_PATH = re.compile(r'path="(res://[^"]+)"')
 # Resource header: [gd_resource ... script_class="ClassName" ...]
 RESOURCE_SCRIPT_CLASS = re.compile(r'script_class="([A-Z][A-Za-z0-9_]*)"')
 
+# project.godot [autoload] entry: `Identifier="*res://path/to/script.gd"`.
+# The leading `*` marks an enabled singleton and is stripped from the captured path.
+AUTOLOAD_ENTRY = re.compile(r'^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*"\*?(res://[^"]+)"\s*$')
+
 
 class Patterns:
     """Container for all regex patterns."""
@@ -61,3 +65,4 @@ class Patterns:
     TSCN_SCRIPT_ATTACH = TSCN_SCRIPT_ATTACH
     RESOURCE_PATH = RESOURCE_PATH
     RESOURCE_SCRIPT_CLASS = RESOURCE_SCRIPT_CLASS
+    AUTOLOAD_ENTRY = AUTOLOAD_ENTRY

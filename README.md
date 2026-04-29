@@ -5,6 +5,7 @@ Static dependency analyzer for [Godot](https://godotengine.org/) projects, inspi
 ## Features
 
 - Parses `.gd`, `.tscn`, and `.tres` files — `extends`, `preload()`, `load()`, `class_name`, scene/resource scripts, and class-name expressions in code (`var x: Foo`, `obj is Foo`, `Foo.STATIC_CONST`)
+- Reads `[autoload]` from `project.godot` and resolves singleton accesses (`TurnManager.foo`, `EventBus.emit_signal(...)`) to their backing scripts
 - Detects circular dependencies
 - Resolves `class_name` declarations to map symbolic inheritance
 - Configurable architectural rules (`forbidden`, `allowed`, `required`, `circular`, `orphan`) via `.gdcruiser.json` or `pyproject.toml`
@@ -209,6 +210,20 @@ For `.tres` files, it detects:
 
 - `script_class="ClassName"` in the `[gd_resource]` header (registers the resource under that class name in the symbol table).
 - Every `[ext_resource path="res://..."]` reference — to scripts, sub-resources, or scenes — so architectural rules can constrain the data layer.
+
+### Autoload singletons
+
+When a `project.godot` file is present at the project root, gdcruiser parses its `[autoload]` section:
+
+```ini
+[autoload]
+TurnManager="*res://scripts/autoload/turn_manager.gd"
+EventBus="*res://scripts/autoload/event_bus.gd"
+```
+
+Each identifier is registered as a global symbol pointing at its backing script (the leading `*` is stripped). Subsequent `TurnManager.foo` or `EventBus.emit_signal(...)` accesses anywhere in the project resolve to that script the same way `class_name` references do — so a rule like `forbidden: { from: "scripts/skills/", to: "scripts/autoload/" }` fires on its own without any extra configuration.
+
+References inside string literals and comments are ignored.
 
 ## Custom Rules
 

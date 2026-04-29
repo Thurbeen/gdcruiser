@@ -5,6 +5,7 @@ from .scanner import Scanner
 from .parser.gdscript import GDScriptParser
 from .parser.tscn import TscnParser
 from .parser.tres import TresParser
+from .parser.project_godot import parse_autoloads
 from .graph.dependency import DependencyGraph
 from .graph.cycles import CycleDetector
 from .symbols.table import SymbolTable
@@ -51,10 +52,19 @@ class Analyzer:
         gd_files, tscn_files, tres_files = self._scanner.find_all_files()
         root = self._scanner.root
 
+        # Register project.godot [autoload] singletons before any class-ref
+        # resolution runs — `TurnManager.foo` then resolves the same way as
+        # any other class_name reference.
+        autoloads = parse_autoloads(root)
+        for identifier, path in autoloads.items():
+            self._symbol_table.register(identifier, path)
+
         if self._verbose:
             print(f"Found {len(gd_files)} GDScript files")
             print(f"Found {len(tscn_files)} scene files")
             print(f"Found {len(tres_files)} resource files")
+            if autoloads:
+                print(f"Registered {len(autoloads)} autoload singletons")
 
         # First pass: parse all GDScript files to build symbol table
         modules = []
