@@ -79,5 +79,7 @@ class DotFormatter:
             DependencyType.PRELOAD: "preload",
             DependencyType.LOAD: "load",
             DependencyType.SCENE_SCRIPT: "script",
+            DependencyType.CLASS_REF: "uses",
+            DependencyType.RESOURCE_REF: "resource",
         }
         return labels.get(dep_type, "")

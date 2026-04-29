@@ -28,9 +28,17 @@ class Scanner:
         """Find all .tscn files in the project."""
         return self._filter(sorted(self._root.rglob("*.tscn")))
 
-    def find_all_files(self) -> tuple[list[Path], list[Path]]:
-        """Find all .gd and .tscn files."""
-        return self.find_gdscript_files(), self.find_scene_files()
+    def find_resource_files(self) -> list[Path]:
+        """Find all .tres files in the project."""
+        return self._filter(sorted(self._root.rglob("*.tres")))
+
+    def find_all_files(self) -> tuple[list[Path], list[Path], list[Path]]:
+        """Find all .gd, .tscn, and .tres files."""
+        return (
+            self.find_gdscript_files(),
+            self.find_scene_files(),
+            self.find_resource_files(),
+        )
 
     def is_godot_project(self) -> bool:
         """Check if the directory is a Godot project (has project.godot)."""

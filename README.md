@@ -4,7 +4,7 @@ Static dependency analyzer for [Godot](https://godotengine.org/) projects, inspi
 
 ## Features
 
-- Parses `.gd` and `.tscn` files — `extends`, `preload()`, `load()`, `class_name`, and scene script references
+- Parses `.gd`, `.tscn`, and `.tres` files — `extends`, `preload()`, `load()`, `class_name`, scene/resource scripts, and class-name expressions in code (`var x: Foo`, `obj is Foo`, `Foo.STATIC_CONST`)
 - Detects circular dependencies
 - Resolves `class_name` declarations to map symbolic inheritance
 - Configurable architectural rules (`forbidden`, `allowed`, `required`, `circular`, `orphan`) via `.gdcruiser.json` or `pyproject.toml`
@@ -196,8 +196,19 @@ gdcruiser detects the following GDScript patterns:
 | `class_name` | `class_name MyClass` |
 | `preload()` | `preload("res://path/to/file.gd")` |
 | `load()` | `load("res://path/to/file.gd")` |
+| Typed annotation | `var x: ClassName`, `func f(c: ClassName) -> ClassName:` |
+| Generic parameter | `Array[ClassName]`, `Dictionary[String, ClassName]` |
+| Type check / cast | `obj is ClassName`, `obj as ClassName` |
+| Static / constant access | `ClassName.method()`, `ClassName.CONSTANT` |
+
+Class-name references (the last four rows) are resolved against `class_name` declarations in the project. Built-in Godot types (`Node`, `Vector2`, `Resource`, …) and unresolved identifiers are filtered out so the graph stays clean.
 
 For `.tscn` files, it detects scripts attached to nodes via `[ext_resource]`.
+
+For `.tres` files, it detects:
+
+- `script_class="ClassName"` in the `[gd_resource]` header (registers the resource under that class name in the symbol table).
+- Every `[ext_resource path="res://..."]` reference — to scripts, sub-resources, or scenes — so architectural rules can constrain the data layer.
 
 ## Custom Rules
 
