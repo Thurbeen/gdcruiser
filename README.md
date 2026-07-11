@@ -43,7 +43,15 @@ gdcruiser [-h] [-f {text,json,dot,mermaid}] [-o FILE] [--no-cycles] [-v] [path]
 | `--validate-config` | Validate config file and exit |
 | `--ignore-rules` | Skip rule evaluation |
 | `--exclude PATTERN` | Regex pattern to exclude paths (can be repeated) |
+| `--cache` | Enable incremental parse caching (default file: `.gdcruiser_cache.json`) |
+| `--cache-file FILE` | Path to the incremental parse cache (implies `--cache`) |
 | `-v, --verbose` | Verbose output |
+
+With caching enabled, unchanged files (matched by modification time and size)
+are restored from the cache instead of being re-parsed — useful for large
+projects run repeatedly in CI or a pre-commit hook. Symbol resolution and cycle
+detection always run fresh, so results are identical to an uncached run. Add
+the cache file to your `.gitignore`.
 
 ### Examples
 

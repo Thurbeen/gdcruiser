@@ -1,4 +1,4 @@
-from gdcruiser.parser.patterns import Patterns
+from gdcruiser.parser import patterns as Patterns
 
 
 class TestExtendsPath:

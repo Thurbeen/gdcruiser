@@ -31,6 +31,15 @@ class Dependency:
             "resolved": self.resolved,
         }
 
+    @classmethod
+    def from_dict(cls, data: dict) -> "Dependency":
+        return cls(
+            target=data["target"],
+            dep_type=DependencyType(data["type"]),
+            line=data.get("line"),
+            resolved=data.get("resolved", True),
+        )
+
 
 @dataclass
 class Module:
@@ -46,3 +55,13 @@ class Module:
             "class_name": self.class_name,
             "dependencies": [d.to_dict() for d in self.dependencies],
         }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Module":
+        return cls(
+            path=data["path"],
+            class_name=data.get("class_name"),
+            dependencies=[
+                Dependency.from_dict(d) for d in data.get("dependencies", [])
+            ],
+        )

@@ -28,31 +28,68 @@ class CycleDetector:
 
         return [scc for scc in self._sccs if len(scc) > 1]
 
-    def _strongconnect(self, path: str) -> None:
-        """Tarjan's algorithm recursive helper."""
-        self._indices[path] = self._index
-        self._lowlinks[path] = self._index
-        self._index += 1
-        self._stack.append(path)
-        self._on_stack.add(path)
-
+    def _successors(self, path: str) -> list[str]:
+        """Return in-graph dependency targets for a node (deduplicated)."""
+        seen: set[str] = set()
+        targets: list[str] = []
         for dep in self._graph.get_dependencies(path):
             target = dep.target
-            if not self._graph.has_module(target):
+            if target in seen or not self._graph.has_module(target):
+                continue
+            seen.add(target)
+            targets.append(target)
+        return targets
+
+    def _strongconnect(self, start: str) -> None:
+        """Iterative Tarjan's algorithm (explicit stack avoids RecursionError)."""
+        successors: dict[str, list[str]] = {}
+        # Each work-stack frame is [node, next-successor-index].
+        work: list[list] = [[start, 0]]
+
+        while work:
+            frame = work[-1]
+            node, next_i = frame
+
+            if next_i == 0:
+                self._indices[node] = self._index
+                self._lowlinks[node] = self._index
+                self._index += 1
+                self._stack.append(node)
+                self._on_stack.add(node)
+                successors[node] = self._successors(node)
+
+            recursed = False
+            node_successors = successors[node]
+            while next_i < len(node_successors):
+                target = node_successors[next_i]
+                next_i += 1
+                if target not in self._indices:
+                    frame[1] = next_i
+                    work.append([target, 0])
+                    recursed = True
+                    break
+                elif target in self._on_stack:
+                    self._lowlinks[node] = min(
+                        self._lowlinks[node], self._indices[target]
+                    )
+
+            if recursed:
                 continue
 
-            if target not in self._indices:
-                self._strongconnect(target)
-                self._lowlinks[path] = min(self._lowlinks[path], self._lowlinks[target])
-            elif target in self._on_stack:
-                self._lowlinks[path] = min(self._lowlinks[path], self._indices[target])
+            # All successors processed — close out this node.
+            if self._lowlinks[node] == self._indices[node]:
+                scc: list[str] = []
+                while True:
+                    w = self._stack.pop()
+                    self._on_stack.remove(w)
+                    scc.append(w)
+                    if w == node:
+                        break
+                self._sccs.append(scc)
 
-        if self._lowlinks[path] == self._indices[path]:
-            scc: list[str] = []
-            while True:
-                w = self._stack.pop()
-                self._on_stack.remove(w)
-                scc.append(w)
-                if w == path:
-                    break
-            self._sccs.append(scc)
+            work.pop()
+            if work:
+                parent = work[-1][0]
+                self._lowlinks[parent] = min(
+                    self._lowlinks[parent], self._lowlinks[node]
+                )

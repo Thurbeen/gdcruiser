@@ -63,6 +63,15 @@ class TextFormatter:
             lines.append("")
             lines.append(self._violation_formatter.format(rule_result))
 
+        # Warnings
+        if result.warnings:
+            lines.append("")
+            lines.append("-" * 40)
+            lines.append("WARNINGS")
+            lines.append("-" * 40)
+            for warning in result.warnings:
+                lines.append(f"  {warning}")
+
         # Errors
         if result.errors:
             lines.append("")

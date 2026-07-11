@@ -3,7 +3,8 @@ from pathlib import Path
 
 from ..graph.node import Module, Dependency, DependencyType
 from ..symbols.table import SymbolTable
-from .patterns import Patterns
+from . import patterns
+from .paths import to_res_path
 
 
 class GDScriptParser:
@@ -14,16 +15,92 @@ class GDScriptParser:
 
     def parse(self, file_path: Path, project_root: Path) -> Module:
         """Parse a GDScript file and return a Module."""
-        rel_path = self._to_res_path(file_path, project_root)
+        rel_path = to_res_path(file_path, project_root)
         content = file_path.read_text(encoding="utf-8")
 
-        class_name = self._extract_class_name(content)
+        # Blank out comments and triple-quoted strings up front so that
+        # `preload`/`load`/`extends`/`ClassName` text living inside them is
+        # never mistaken for real code. Single-line string literals are kept
+        # because preload/load/extends paths live inside them.
+        code = self._preprocess(content)
+
+        class_name = self._extract_class_name(code)
         if class_name:
             self._symbol_table.register(class_name, rel_path)
 
-        dependencies = self._extract_dependencies(content)
+        dependencies = self._extract_dependencies(code)
 
         return Module(path=rel_path, class_name=class_name, dependencies=dependencies)
+
+    @staticmethod
+    def _preprocess(content: str) -> str:
+        """Return a "code view" of the source for pattern matching.
+
+        Comments (``# ...``) and triple-quoted strings are replaced with
+        spaces, preserving newlines so line numbers stay accurate. Single-line
+        string literals are left intact because ``preload("res://...")`` and
+        ``extends "res://..."`` keep their target inside a quoted string.
+        """
+        out: list[str] = []
+        i = 0
+        n = len(content)
+        state = "code"  # code | comment | line_str | triple_str
+        quote = ""
+        while i < n:
+            ch = content[i]
+            if state == "code":
+                if ch == "#":
+                    state = "comment"
+                    out.append(" ")
+                    i += 1
+                elif content.startswith('"""', i) or content.startswith("'''", i):
+                    quote = content[i : i + 3]
+                    state = "triple_str"
+                    out.append("   ")
+                    i += 3
+                elif ch in ('"', "'"):
+                    quote = ch
+                    state = "line_str"
+                    out.append(ch)
+                    i += 1
+                else:
+                    out.append(ch)
+                    i += 1
+            elif state == "comment":
+                if ch == "\n":
+                    state = "code"
+                    out.append("\n")
+                else:
+                    out.append(" ")
+                i += 1
+            elif state == "line_str":
+                if ch == "\\" and i + 1 < n:
+                    out.append(content[i : i + 2])
+                    i += 2
+                elif ch == quote:
+                    out.append(ch)
+                    state = "code"
+                    i += 1
+                elif ch == "\n":
+                    # Unterminated single-line string — bail back to code.
+                    out.append("\n")
+                    state = "code"
+                    i += 1
+                else:
+                    out.append(ch)
+                    i += 1
+            else:  # triple_str
+                if content.startswith(quote, i):
+                    out.append("   ")
+                    state = "code"
+                    i += 3
+                elif ch == "\n":
+                    out.append("\n")
+                    i += 1
+                else:
+                    out.append(" ")
+                    i += 1
+        return "".join(out)
 
     def resolve_class_dependencies(self, module: Module) -> None:
         """Resolve class-name dependencies using the symbol table.
@@ -55,32 +132,22 @@ class GDScriptParser:
                 kept.append(dep)
         module.dependencies = kept
 
-    def _to_res_path(self, file_path: Path, project_root: Path) -> str:
-        """Convert absolute path to res:// path."""
-        rel = file_path.resolve().relative_to(project_root.resolve())
-        return f"res://{rel.as_posix()}"
-
     def _extract_class_name(self, content: str) -> str | None:
         """Extract class_name declaration from content."""
         for line in content.splitlines():
-            match = Patterns.CLASS_NAME.match(line)
+            match = patterns.CLASS_NAME.match(line)
             if match:
                 return match.group(1)
         return None
 
     def _extract_dependencies(self, content: str) -> list[Dependency]:
-        """Extract all dependencies from content."""
+        """Extract all dependencies from content (already comment/string-stripped)."""
         dependencies: list[Dependency] = []
         seen_class_refs: set[str] = set()
 
         for line_num, line in enumerate(content.splitlines(), start=1):
-            # Skip comments
-            stripped = line.lstrip()
-            if stripped.startswith("#"):
-                continue
-
             # extends "res://..."
-            match = Patterns.EXTENDS_PATH.match(line)
+            match = patterns.EXTENDS_PATH.match(line)
             if match:
                 dependencies.append(
                     Dependency(
@@ -92,7 +159,7 @@ class GDScriptParser:
                 continue
 
             # extends ClassName
-            match = Patterns.EXTENDS_CLASS.match(line)
+            match = patterns.EXTENDS_CLASS.match(line)
             if match:
                 class_ref = match.group(1)
                 # Skip built-in classes (Node, Resource, etc.)
@@ -108,11 +175,11 @@ class GDScriptParser:
                 continue
 
             # class_name declaration — never a dependency.
-            if Patterns.CLASS_NAME.match(line):
+            if patterns.CLASS_NAME.match(line):
                 continue
 
             # preload("res://...")
-            for match in Patterns.PRELOAD.finditer(line):
+            for match in patterns.PRELOAD.finditer(line):
                 dependencies.append(
                     Dependency(
                         target=match.group(1),
@@ -122,7 +189,7 @@ class GDScriptParser:
                 )
 
             # load("res://...")
-            for match in Patterns.LOAD.finditer(line):
+            for match in patterns.LOAD.finditer(line):
                 dependencies.append(
                     Dependency(
                         target=match.group(1),
@@ -169,11 +236,11 @@ class GDScriptParser:
         """Extract class-name references from a sanitized line."""
         refs: list[str] = []
         for pattern in (
-            Patterns.TYPED_REF,
-            Patterns.RETURN_TYPE,
-            Patterns.IS_AS_REF,
-            Patterns.MEMBER_ACCESS,
-            Patterns.GENERIC_PARAM,
+            patterns.TYPED_REF,
+            patterns.RETURN_TYPE,
+            patterns.IS_AS_REF,
+            patterns.MEMBER_ACCESS,
+            patterns.GENERIC_PARAM,
         ):
             for match in pattern.finditer(line):
                 refs.append(match.group(1))
@@ -482,5 +549,41 @@ _BUILTIN_CLASSES: frozenset[str] = frozenset(
         "EditorImportPlugin",
         "EditorExportPlugin",
         "EditorFileSystem",
+        # Abstract physics/visual bases and other commonly-extended node
+        # types that are easy to omit above (an `extends` of any of these is
+        # a built-in, not a broken project dependency).
+        "PhysicsBody2D",
+        "PhysicsBody3D",
+        "CollisionObject2D",
+        "GeometryInstance3D",
+        "VisualInstance3D",
+        "VisibleOnScreenNotifier2D",
+        "VisibleOnScreenNotifier3D",
+        "VisibleOnScreenEnabler2D",
+        "VisibleOnScreenEnabler3D",
+        "Parallax2D",
+        "ParallaxBackground",
+        "ParallaxLayer",
+        "RemoteTransform2D",
+        "RemoteTransform3D",
+        "Line2D",
+        "Polygon2D",
+        "PointLight2D",
+        "CanvasModulate",
+        "GridMap",
+        "WorldEnvironment",
+        "SpringArm3D",
+        "PhysicalBone3D",
+        "SoftBody3D",
+        "VehicleBody3D",
+        "CSGShape3D",
+        "CSGBox3D",
+        "CSGCombiner3D",
+        "ReflectionProbe",
+        "VoxelGI",
+        "LightmapGI",
+        "OccluderInstance3D",
+        "FogVolume",
+        "Decal",
     }
 )
