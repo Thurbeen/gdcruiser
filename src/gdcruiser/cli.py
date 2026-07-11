@@ -3,11 +3,9 @@ import sys
 from pathlib import Path
 
 from .analyzer import Analyzer
+from .cache import ParseCache
 from .config import ConfigError, ConfigLoader, ConfigValidator
-from .output.dot import DotFormatter
-from .output.json import JsonFormatter
-from .output.mermaid import MermaidFormatter
-from .output.text import TextFormatter
+from .output import FORMATTERS
 from .rules import RuleEngine
 
 
@@ -40,7 +38,7 @@ Examples:
     parser.add_argument(
         "-f",
         "--format",
-        choices=["text", "json", "dot", "mermaid"],
+        choices=list(FORMATTERS),
         default="text",
         help="Output format (default: text)",
     )
@@ -91,6 +89,18 @@ Examples:
         help="Regex pattern to exclude paths from analysis (can be repeated)",
     )
 
+    parser.add_argument(
+        "--cache",
+        action="store_true",
+        help="Enable incremental parse caching (default file: .gdcruiser_cache.json)",
+    )
+
+    parser.add_argument(
+        "--cache-file",
+        metavar="FILE",
+        help="Path to the incremental parse cache (implies --cache)",
+    )
+
     return parser
 
 
@@ -114,6 +124,11 @@ def run(args: argparse.Namespace) -> int:
     except ConfigError as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
+
+    # Surface non-fatal config issues (unknown keys, bad severity values) even
+    # when they leave no valid rules behind (e.g. a mistyped section name).
+    for w in config.warnings:
+        print(f"Warning: {w}", file=sys.stderr)
 
     # Validate config
     if config.has_rules() or args.validate_config:
@@ -150,7 +165,22 @@ def run(args: argparse.Namespace) -> int:
     if args.exclude:
         exclude.extend(args.exclude)
 
-    analyzer = Analyzer(project_path, verbose=args.verbose, exclude=exclude or None)
+    cache = None
+    if args.cache or args.cache_file:
+        cache_path = (
+            Path(args.cache_file)
+            if args.cache_file
+            else project_path / ".gdcruiser_cache.json"
+        )
+        cache = ParseCache(cache_path)
+        cache.load()
+
+    analyzer = Analyzer(
+        project_path,
+        verbose=args.verbose,
+        exclude=exclude or None,
+        cache=cache,
+    )
     result = analyzer.analyze(detect_cycles=not args.no_cycles)
 
     # Evaluate rules
@@ -166,18 +196,8 @@ def run(args: argparse.Namespace) -> int:
             )
 
     # Format output
-    if args.format == "json":
-        formatter = JsonFormatter()
-        output = formatter.format(result, rule_result)
-    elif args.format == "dot":
-        formatter = DotFormatter()
-        output = formatter.format(result)
-    elif args.format == "mermaid":
-        formatter = MermaidFormatter()
-        output = formatter.format(result)
-    else:
-        formatter = TextFormatter()
-        output = formatter.format(result, rule_result)
+    formatter = FORMATTERS[args.format]()
+    output = formatter.format(result, rule_result)
 
     # Write output
     if args.output:

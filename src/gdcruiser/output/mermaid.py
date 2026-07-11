@@ -1,5 +1,6 @@
 from ..analyzer import AnalysisResult
-from ..graph.node import DependencyType
+from ..rules.models import RuleCheckResult
+from .labels import cycle_node_set, escape_mermaid_label, short_path, type_label
 
 
 class MermaidFormatter:
@@ -8,22 +9,21 @@ class MermaidFormatter:
     def __init__(self, show_type: bool = True) -> None:
         self._show_type = show_type
 
-    def format(self, result: AnalysisResult) -> str:
+    def format(
+        self, result: AnalysisResult, rule_result: RuleCheckResult | None = None
+    ) -> str:
         lines: list[str] = []
         lines.append("graph LR")
 
-        # Find cycle nodes for highlighting
-        cycle_nodes: set[str] = set()
-        for cycle in result.cycles:
-            cycle_nodes.update(cycle)
+        cycle_nodes = cycle_node_set(result)
 
         # Node declarations
         cycle_node_ids: list[str] = []
         for module in result.graph.all_modules():
             node_id = self._node_id(module.path)
-            label = self._short_path(module.path)
+            label = escape_mermaid_label(short_path(module.path))
             if module.class_name:
-                label = f"{module.class_name}<br/>{label}"
+                label = f"{escape_mermaid_label(module.class_name)}<br/>{label}"
 
             lines.append(f'    {node_id}["{label}"]')
 
@@ -39,16 +39,16 @@ class MermaidFormatter:
             source_id = self._node_id(module.path)
             for dep in module.dependencies:
                 target_id = self._node_id(dep.target)
-                type_label = self._type_label(dep.dep_type) if self._show_type else ""
+                label = type_label(dep.dep_type) if self._show_type else ""
                 is_cycle_edge = module.path in cycle_nodes and dep.target in cycle_nodes
 
                 if is_cycle_edge:
-                    if type_label:
-                        lines.append(f"    {source_id} == {type_label} ==> {target_id}")
+                    if label:
+                        lines.append(f"    {source_id} == {label} ==> {target_id}")
                     else:
                         lines.append(f"    {source_id} ==> {target_id}")
-                elif type_label:
-                    lines.append(f"    {source_id} -- {type_label} --> {target_id}")
+                elif label:
+                    lines.append(f"    {source_id} -- {label} --> {target_id}")
                 else:
                     lines.append(f"    {source_id} --> {target_id}")
 
@@ -71,22 +71,3 @@ class MermaidFormatter:
     def _node_id(self, path: str) -> str:
         """Convert a res:// path to a valid Mermaid node ID."""
         return path.replace("://", "_").replace("/", "_").replace(".", "_")
-
-    def _short_path(self, path: str) -> str:
-        """Shorten path for display."""
-        if path.startswith("res://"):
-            return path[6:]
-        return path
-
-    def _type_label(self, dep_type: DependencyType) -> str:
-        """Get a short label for dependency type."""
-        labels = {
-            DependencyType.EXTENDS_PATH: "extends",
-            DependencyType.EXTENDS_CLASS: "extends",
-            DependencyType.PRELOAD: "preload",
-            DependencyType.LOAD: "load",
-            DependencyType.SCENE_SCRIPT: "script",
-            DependencyType.CLASS_REF: "uses",
-            DependencyType.RESOURCE_REF: "resource",
-        }
-        return labels.get(dep_type, "")

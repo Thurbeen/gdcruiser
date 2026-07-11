@@ -1,5 +1,6 @@
 from ..analyzer import AnalysisResult
-from ..graph.node import DependencyType
+from ..rules.models import RuleCheckResult
+from .labels import cycle_node_set, escape_dot_label, short_path, type_label
 
 
 class DotFormatter:
@@ -8,7 +9,9 @@ class DotFormatter:
     def __init__(self, show_type: bool = True) -> None:
         self._show_type = show_type
 
-    def format(self, result: AnalysisResult) -> str:
+    def format(
+        self, result: AnalysisResult, rule_result: RuleCheckResult | None = None
+    ) -> str:
         lines: list[str] = []
         lines.append("digraph dependencies {")
         lines.append("    rankdir=LR;")
@@ -16,15 +19,12 @@ class DotFormatter:
         lines.append('    edge [fontname="monospace", fontsize=10];')
         lines.append("")
 
-        # Find cycle nodes for highlighting
-        cycle_nodes: set[str] = set()
-        for cycle in result.cycles:
-            cycle_nodes.update(cycle)
+        cycle_nodes = cycle_node_set(result)
 
         # Node declarations
         for module in result.graph.all_modules():
             node_id = self._node_id(module.path)
-            label = self._short_path(module.path)
+            label = short_path(module.path)
             if module.class_name:
                 label = f"{module.class_name}\\n{label}"
 
@@ -32,7 +32,7 @@ class DotFormatter:
             if module.path in cycle_nodes:
                 style = ', style=filled, fillcolor="#ffcccc"'
 
-            lines.append(f'    {node_id} [label="{label}"{style}];')
+            lines.append(f'    {node_id} [label="{escape_dot_label(label)}"{style}];')
 
         lines.append("")
 
@@ -44,7 +44,9 @@ class DotFormatter:
                 attrs = []
 
                 if self._show_type:
-                    attrs.append(f'label="{self._type_label(dep.dep_type)}"')
+                    attrs.append(
+                        f'label="{escape_dot_label(type_label(dep.dep_type))}"'
+                    )
 
                 if not dep.resolved:
                     attrs.append("style=dashed")
@@ -63,23 +65,4 @@ class DotFormatter:
 
     def _node_id(self, path: str) -> str:
         """Convert a path to a valid DOT node ID."""
-        return f'"{path}"'
-
-    def _short_path(self, path: str) -> str:
-        """Shorten path for display."""
-        if path.startswith("res://"):
-            return path[6:]
-        return path
-
-    def _type_label(self, dep_type: DependencyType) -> str:
-        """Get a short label for dependency type."""
-        labels = {
-            DependencyType.EXTENDS_PATH: "extends",
-            DependencyType.EXTENDS_CLASS: "extends",
-            DependencyType.PRELOAD: "preload",
-            DependencyType.LOAD: "load",
-            DependencyType.SCENE_SCRIPT: "script",
-            DependencyType.CLASS_REF: "uses",
-            DependencyType.RESOURCE_REF: "resource",
-        }
-        return labels.get(dep_type, "")
+        return f'"{escape_dot_label(path)}"'

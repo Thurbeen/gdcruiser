@@ -33,3 +33,6 @@ htmlcov/
 
 # mypy
 .mypy_cache/
+
+# gdcruiser incremental parse cache
+.gdcruiser_cache.json

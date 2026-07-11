@@ -34,7 +34,7 @@ class ConfigLoader:
                 content = pyproject_path.read_text(encoding="utf-8")
                 if "[tool.gdcruiser]" in content or "[[tool.gdcruiser." in content:
                     return pyproject_path
-            except Exception:
+            except (OSError, UnicodeDecodeError):
                 pass
 
         return None
@@ -90,32 +90,68 @@ class ConfigLoader:
 
         return self._parse_config(tool_config)
 
+    _TOP_LEVEL_KEYS = frozenset({"forbidden", "allowed", "required", "options"})
+    _RULE_KEYS = frozenset(
+        {"name", "severity", "comment", "from", "to", "circular", "orphan"}
+    )
+    _MATCHER_KEYS = frozenset({"path", "pathNot"})
+    _OPTION_KEYS = frozenset({"exclude"})
+
     def _parse_config(self, data: dict) -> Config:
         """Parse configuration dictionary into Config object."""
-        forbidden = [self._parse_rule(r) for r in data.get("forbidden", [])]
-        allowed = [self._parse_rule(r) for r in data.get("allowed", [])]
-        required = [self._parse_rule(r) for r in data.get("required", [])]
-        options = self._parse_options(data.get("options", {}))
+        warnings: list[str] = []
+        self._warn_unknown_keys(data, self._TOP_LEVEL_KEYS, "config", warnings)
+
+        forbidden = [
+            self._parse_rule(r, f"forbidden[{i}]", warnings)
+            for i, r in enumerate(data.get("forbidden", []))
+        ]
+        allowed = [
+            self._parse_rule(r, f"allowed[{i}]", warnings)
+            for i, r in enumerate(data.get("allowed", []))
+        ]
+        required = [
+            self._parse_rule(r, f"required[{i}]", warnings)
+            for i, r in enumerate(data.get("required", []))
+        ]
+        options = self._parse_options(data.get("options", {}), warnings)
 
         return Config(
             forbidden=forbidden,
             allowed=allowed,
             required=required,
             options=options,
+            warnings=warnings,
         )
 
-    def _parse_rule(self, data: dict) -> Rule:
+    def _warn_unknown_keys(
+        self, data: dict, known: frozenset[str], path: str, warnings: list[str]
+    ) -> None:
+        """Record a warning for each key in ``data`` not in ``known``."""
+        for key in data:
+            if key not in known:
+                warnings.append(f"{path}: unknown key '{key}' (ignored)")
+
+    def _parse_rule(self, data: dict, path: str, warnings: list[str]) -> Rule:
         """Parse a rule dictionary into a Rule object."""
+        self._warn_unknown_keys(data, self._RULE_KEYS, path, warnings)
         name = data.get("name", "unnamed")
 
-        severity_str = data.get("severity", "error").lower()
+        severity_str = str(data.get("severity", "error")).lower()
         try:
             severity = Severity(severity_str)
         except ValueError:
             severity = Severity.ERROR
+            valid = ", ".join(s.value for s in Severity)
+            warnings.append(
+                f"{path}.severity: unknown value '{severity_str}', "
+                f"defaulting to 'error' (valid: {valid})"
+            )
 
         from_data = data.get("from", {})
         to_data = data.get("to", {})
+        self._warn_unknown_keys(from_data, self._MATCHER_KEYS, f"{path}.from", warnings)
+        self._warn_unknown_keys(to_data, self._MATCHER_KEYS, f"{path}.to", warnings)
 
         return Rule(
             name=name,
@@ -133,8 +169,9 @@ class ConfigLoader:
             orphan=data.get("orphan", False),
         )
 
-    def _parse_options(self, data: dict) -> ConfigOptions:
+    def _parse_options(self, data: dict, warnings: list[str]) -> ConfigOptions:
         """Parse options dictionary into ConfigOptions object."""
+        self._warn_unknown_keys(data, self._OPTION_KEYS, "options", warnings)
         return ConfigOptions(
             exclude=data.get("exclude", []),
         )

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from .patterns import Patterns
+from . import patterns
 
 
 def parse_autoloads(project_root: Path) -> dict[str, str]:
@@ -31,7 +31,7 @@ def parse_autoloads(project_root: Path) -> dict[str, str]:
         if not in_section:
             continue
 
-        match = Patterns.AUTOLOAD_ENTRY.match(stripped)
+        match = patterns.AUTOLOAD_ENTRY.match(stripped)
         if match:
             identifier, path = match.group(1), match.group(2)
             autoloads[identifier] = path

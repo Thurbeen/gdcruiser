@@ -55,6 +55,8 @@ class Config:
     allowed: list[Rule] = field(default_factory=list)
     required: list[Rule] = field(default_factory=list)
     options: ConfigOptions = field(default_factory=ConfigOptions)
+    # Non-fatal issues found while loading (unknown keys, bad enum values).
+    warnings: list[str] = field(default_factory=list)
 
     def has_rules(self) -> bool:
         """Check if any rules are defined."""

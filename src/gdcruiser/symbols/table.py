@@ -4,11 +4,22 @@ class SymbolTable:
     def __init__(self) -> None:
         self._class_to_path: dict[str, str] = {}
         self._path_to_class: dict[str, str] = {}
+        # (class_name, existing_path, new_path) for each name registered more
+        # than once to a *different* path — Godot itself rejects duplicate
+        # global class names, so these are surfaced as warnings.
+        self._collisions: list[tuple[str, str, str]] = []
 
     def register(self, class_name: str, path: str) -> None:
         """Register a class_name declaration."""
+        existing = self._class_to_path.get(class_name)
+        if existing is not None and existing != path:
+            self._collisions.append((class_name, existing, path))
         self._class_to_path[class_name] = path
         self._path_to_class[path] = class_name
+
+    def collisions(self) -> list[tuple[str, str, str]]:
+        """Return recorded duplicate-registration collisions."""
+        return list(self._collisions)
 
     def resolve(self, class_name: str) -> str | None:
         """Resolve a class_name to its file path."""

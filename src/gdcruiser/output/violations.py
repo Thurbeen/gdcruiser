@@ -1,7 +1,9 @@
 """Violation output formatters."""
 
+from collections import defaultdict
+
 from ..config.models import Severity
-from ..rules.models import RuleCheckResult
+from ..rules.models import RuleCheckResult, Violation
 
 
 class ViolationTextFormatter:
@@ -28,12 +30,9 @@ class ViolationTextFormatter:
         lines.append("-" * 40)
 
         # Group violations by rule
-        by_rule: dict[str, list] = {}
+        by_rule: dict[str, list[Violation]] = defaultdict(list)
         for v in result.violations:
-            rule_name = v.rule.name
-            if rule_name not in by_rule:
-                by_rule[rule_name] = []
-            by_rule[rule_name].append(v)
+            by_rule[v.rule.name].append(v)
 
         for rule_name, violations in by_rule.items():
             first = violations[0]
